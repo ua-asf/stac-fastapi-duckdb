@@ -125,11 +125,12 @@ def create_handler(app):
 handler = create_handler(app)
 
 def handler2(event, context):
+    # If needed for troubleshooting API Gateway behavior
     from mangum import Mangum
 
-    #print(f"Event: {event}")
+    print(f"Event: {event}")
     asgi_handler = Mangum(app)
-    response = asgi_handler(event, context) # Call the instance with the event arguments
-    #print(f"Response: {response}")
+    response = asgi_handler(event, context)
+    print(f"Response: {response}")
 
     return response
