@@ -16,10 +16,17 @@ services:
       - BACKEND=duckdb
       - PARQUET_URLS_JSON=${PARQUET_URLS_JSON}
       - HTTP_CACHE_PATH=${HTTP_CACHE_PATH:-/tmp/duckdb_http_cache}
+      - AWS_DEFAULT_REGION=us-east-2
+      - AWS_DEFAULT_PROFILE=${AWS_DEFAULT_PROFILE}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
     ports:
       - "8085:8084"
     volumes:
-      - ./stac_collections:/app/stac_collections
+      - ./../sam/duck-stac/code/data/stac_collections:/app/stac_collections
+      - ./../sam/duck-stac/code/data/:/data
+      # - ./stac_collections:/app/stac_collections
       - ./stac_fastapi:/app/stac_fastapi
+      - $HOME/.aws/:/root/.aws
     command:
       bash -c "python -m stac_fastapi.duckdb.app"

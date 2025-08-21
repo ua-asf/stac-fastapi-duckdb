@@ -3,6 +3,7 @@ import json
 import os
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
+import traceback
 
 import duckdb
 from stac_fastapi.core.base_settings import ApiBaseSettings
@@ -10,6 +11,7 @@ from stac_fastapi.core.base_settings import ApiBaseSettings
 # from stac_fastapi.core.utilities import get_bool_env
 from stac_fastapi.types.config import ApiSettings
 
+conn = None
 
 class DuckDBSettings(ApiSettings, ApiBaseSettings):
     """DuckDB API settings and configuration."""
@@ -102,28 +104,46 @@ class DuckDBSettings(ApiSettings, ApiBaseSettings):
 
     @contextmanager
     def create_connection(self):
+
+        global conn
+
         """Create a per-request DuckDB connection with httpfs and basic caching configured."""
-        conn = duckdb.connect(database=":memory:")
+
         try:
-            # Enable remote I/O via httpfs where available
-            try:
-                conn.execute("INSTALL httpfs;")
-            except Exception:
-                pass
-            try:
-                conn.execute("LOAD httpfs;")
-            except Exception:
-                pass
-            # Best-effort caching knobs
-            try:
-                conn.execute("SET enable_http_metadata_cache=true")
-                conn.execute("SET enable_object_cache=true")
-                conn.execute(f"SET http_metadata_cache='{self.http_cache_path}'")
-            except Exception:
-                pass
+            if not conn:
+                conn = duckdb.connect(database="/tmp/stac.db")
+
+                #conn.execute("SET home_directory='/root/'")
+
+                # Enable remote I/O via httpfs where available
+                try:
+                    conn.execute("INSTALL httpfs;")
+                except Exception:
+                    pass
+                try:
+                    conn.execute("LOAD httpfs;")
+                except Exception:
+                    pass
+                # Best-effort caching knobs
+                try:
+                    AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-west-2")
+                    # set up secret
+                    conn.execute(f"""
+                        CREATE SECRET IF NOT EXISTS secretaws (
+                            TYPE S3,
+                            PROVIDER CREDENTIAL_CHAIN,
+                            REGION '{AWS_DEFAULT_REGION}'
+                        );
+                    """)
+
+                    conn.execute("SET enable_http_metadata_cache=true")
+                    conn.execute("SET enable_object_cache=true")
+                    conn.execute("SET parquet_metadata_cache=true")
+
+                except Exception:
+                    traceback.print_exc()
+                    pass
             yield conn
         finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
+            pass
+

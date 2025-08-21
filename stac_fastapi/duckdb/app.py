@@ -122,5 +122,15 @@ def create_handler(app):
     except ImportError:
         return None
 
-
 handler = create_handler(app)
+
+def handler2(event, context):
+    # If needed for troubleshooting API Gateway behavior
+    from mangum import Mangum
+
+    print(f"Event: {event}")
+    asgi_handler = Mangum(app)
+    response = asgi_handler(event, context)
+    print(f"Response: {response}")
+
+    return response
