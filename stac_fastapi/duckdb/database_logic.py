@@ -626,9 +626,9 @@ class DatabaseLogic:
         # return mongo_sort
 
     async def get_total_count(
-            self,
-            search: dict,
-            collection_ids: Optional[List[str]] = None,
+        self,
+        search: dict,
+        collection_ids: Optional[List[str]] = None,
     ) -> Optional[int]:
         """Get the total count of items matching the search criteria.
 
