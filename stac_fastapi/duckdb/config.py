@@ -127,9 +127,6 @@ class DuckDBSettings(ApiSettings, ApiBaseSettings):
                 # Best-effort caching knobs
                 try:
                     AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-west-2")
-                    AWS_KEY =  os.getenv("AWS_ACCESS_KEY_ID")
-                    AWS_SECRET = os.getenv("AWS_SECRET_ACCESS_KEY")
-                    print(f"AWS  is {AWS_DEFAULT_REGION}/{AWS_KEY}/{AWS_SECRET}")
                     # set up secret
                     conn.execute(f"""
                         CREATE SECRET IF NOT EXISTS secretaws (
