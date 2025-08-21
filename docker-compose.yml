@@ -23,8 +23,8 @@ services:
     ports:
       - "8085:8084"
     volumes:
-      - ./../sam/duck-stac/code/data/stac_collections:/app/stac_collections
-      - ./../sam/duck-stac/code/data/:/data
+      - ./../duck-stac/lambda_root/data/stac_collections:/app/stac_collections
+      - ./../duck-stac/lambda_root/data/:/data
       # - ./stac_collections:/app/stac_collections
       - ./stac_fastapi:/app/stac_fastapi
       - $HOME/.aws/:/root/.aws
