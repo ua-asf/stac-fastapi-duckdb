@@ -122,5 +122,14 @@ def create_handler(app):
     except ImportError:
         return None
 
-
 handler = create_handler(app)
+
+def handler2(event, context):
+    from mangum import Mangum
+
+    #print(f"Event: {event}")
+    asgi_handler = Mangum(app)
+    response = asgi_handler(event, context) # Call the instance with the event arguments
+    #print(f"Response: {response}")
+
+    return response

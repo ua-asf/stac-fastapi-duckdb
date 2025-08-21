@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import traceback
 from typing import (
     Any,
     Dict,
@@ -166,16 +167,17 @@ class DatabaseLogic:
             with self.settings.create_connection() as conn:
                 # Use the same query pattern as in execute_search for consistency
                 query = """
-                    SELECT * FROM (
-                        SELECT *, ? AS collection
+                    SELECT * EXCLUDE(links) FROM (
+                        SELECT *
                         FROM read_parquet(?)
+                        where collection = ?
                     )
                     WHERE id = ?
                     LIMIT 1
                 """
 
                 try:
-                    df = conn.execute(query, [collection_id, url, item_id]).df()
+                    df = conn.execute(query, [url, collection_id, item_id]).df()
                     if df.empty:
                         raise HTTPException(
                             status_code=404,
@@ -186,15 +188,18 @@ class DatabaseLogic:
                     item = create_stac_item(
                         df=df, collection_id=collection_id, item_id=item_id
                     )
+                    print(f"Return in get_one_item(): {item}")
                     return item
 
                 except Exception as db_error:
                     print(f"Database error in get_one_item: {str(db_error)}")
+                    traceback.print_exc()
                     raise HTTPException(
                         status_code=500, detail=f"Error querying item: {str(db_error)}"
                     )
 
         except HTTPException:
+            traceback.print_exc()
             raise
         except Exception as e:
             print(f"Unexpected error in get_one_item: {str(e)}")
@@ -620,74 +625,6 @@ class DatabaseLogic:
 
         # return mongo_sort
 
-    async def get_total_count(
-        self,
-        search: dict,
-        collection_ids: Optional[List[str]] = None,
-    ) -> Optional[int]:
-        """Get the total count of items matching the search criteria.
-        
-        Args:
-            search (dict): The search dictionary containing filters
-            collection_ids (Optional[List[str]]): Collection IDs to search, or None for all
-            
-        Returns:
-            Optional[int]: Total count of matching items, or None if count failed
-        """
-        try:
-            # If no collection IDs provided, search all available collections
-            if not collection_ids:
-                all_collection_ids = list(self.settings.parquet_urls.keys())
-                if not all_collection_ids:
-                    return 0
-                collection_ids = all_collection_ids
-
-            # Resolve sources for the collections
-            sources = self.settings.resolve_sources(collection_ids)
-            
-            # Get filters from search
-            item_ids: Optional[List[str]] = (
-                search.get("item_ids") if isinstance(search, dict) else None
-            )
-
-            # Build count query for each collection
-            count_subqueries: List[str] = []
-            count_params: List[Any] = []
-            
-            for cid, url in sources:
-                count_sq = "SELECT COUNT(*) as count FROM read_parquet(?)"
-                count_params.append(url)
-                count_wheres: List[str] = []
-                
-                # Add item_ids filter if specified
-                if item_ids:
-                    placeholders = ", ".join(["?"] * len(item_ids))
-                    count_wheres.append(f"id IN ({placeholders})")
-                    count_params.extend(item_ids)
-                
-                # Add datetime and other filters if specified
-                if 'filters' in search and search['filters']:
-                    count_wheres.extend(search['filters'])
-                
-                if count_wheres:
-                    count_sq += " WHERE " + " AND ".join(count_wheres)
-                count_subqueries.append(count_sq)
-
-            # Execute count query
-            if not count_subqueries:
-                return 0
-                
-            count_union_sql = " UNION ALL ".join(count_subqueries)
-            final_count_sql = f"SELECT SUM(count) as total_count FROM ({count_union_sql})"
-            
-            with self.settings.create_connection() as conn:
-                count_result = conn.execute(final_count_sql, count_params).fetchone()
-                return int(count_result[0]) if count_result and count_result[0] is not None else 0
-                
-        except Exception as e:
-            logger.warning(f"Failed to calculate total count: {str(e)}")
-            return None
-
     async def execute_search(
         self,
         search: dict,
@@ -745,8 +682,8 @@ class DatabaseLogic:
         subqueries: List[str] = []
         params: List[Any] = []
         for cid, url in sources:
-            sq = "SELECT *, ? AS collection FROM read_parquet(?)"
-            params.extend([cid, url])
+            sq = "SELECT * FROM read_parquet(?) where collection = ?"
+            params.extend([url,cid])
             wheres: List[str] = []
             
             # Add item_ids filter if specified
@@ -764,7 +701,7 @@ class DatabaseLogic:
             subqueries.append(sq)
 
         union_sql = " UNION ALL ".join(subqueries)
-        base_sql = f"SELECT * FROM ({union_sql})"
+        base_sql = f"SELECT * EXCLUDE(links) FROM ({union_sql})"
 
         # Sorting
         if sort:
@@ -796,6 +733,7 @@ class DatabaseLogic:
             if "not found" in str(e).lower():
                 from stac_fastapi.types.errors import NotFoundError
                 raise NotFoundError(f"Collections '{collection_ids}' do not exist")
+            traceback.print_exc()
             raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
         # Determine if there are more results and create next token
@@ -806,8 +744,8 @@ class DatabaseLogic:
         if has_more and limit:
             next_token = str(offset_val + limit)
 
-        # Calculate total count for numMatched using the dedicated function
-        total = await self.get_total_count(search, collection_ids)
+        # Optional total count (expensive for large datasets, so we omit for now)
+        total: Optional[int] = None
 
         # Convert each row to a proper STAC item using create_stac_item
         items = []

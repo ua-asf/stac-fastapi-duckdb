@@ -15,7 +15,8 @@ build: ## Build docker image
 	docker compose build
 
 up: ## Run docker compose in foreground with demo env
-	STAC_FILE_PATH="$(STAC_DIR)" PARQUET_URLS_JSON='{"io-lulc-9-class":"$(PARQUET_URL)"}' HTTP_CACHE_PATH="$(HTTP_CACHE_PATH)" docker compose up
+	STAC_FILE_PATH="$(STAC_DIR)" PARQUET_URLS_JSON='{"glo-30-hand":"s3://stacbuckets/all_collections.parquet","sentinel-1-global-coherence":"s3://stacbuckets/all_collections.parquet"}' HTTP_CACHE_PATH="$(HTTP_CACHE_PATH)" docker compose up
+	# STAC_FILE_PATH="$(STAC_DIR)" PARQUET_URLS_JSON='{"glo-30-hand":"/data/all_collections.parquet","sentinel-1-global-coherence":"/data/all_collections.parquet"}' HTTP_CACHE_PATH="$(HTTP_CACHE_PATH)" docker compose up
 
 up-d: ## Run docker compose detached with demo env
 	STAC_FILE_PATH="$(STAC_DIR)" PARQUET_URLS_JSON='{"io-lulc-9-class":"$(PARQUET_URL)"}' HTTP_CACHE_PATH="$(HTTP_CACHE_PATH)" docker compose up -d
